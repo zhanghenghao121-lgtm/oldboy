@@ -1,0 +1,48 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      MARIADB_DATABASE: ${DB_NAME:-jobdb}
+      MARIADB_USER: ${DB_USER:-jobuser}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-jobpass}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  redis:
+    image: redis:7.4-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - ./env/prod.env
+    depends_on:
+      - mariadb
+      - redis
+    command: >
+      sh -c "python manage.py migrate &&
+             gunicorn config.wsgi:application -b 0.0.0.0:8000 --workers 3"
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+
+volumes:
+  mariadb_data:
+  redis_data:
