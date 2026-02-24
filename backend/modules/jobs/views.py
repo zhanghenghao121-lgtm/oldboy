@@ -11,13 +11,22 @@ from .serializers import JobSearchSerializer, AnalyzeSerializer
 from .services import search_jobs
 
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 def job_search(request):
-    serializer = JobSearchSerializer(data=request.data)
+    payload = request.query_params if request.method == "GET" else request.data
+    serializer = JobSearchSerializer(data=payload)
     if not serializer.is_valid():
         return fail(message="invalid params", data=serializer.errors)
-    data = search_jobs(serializer.validated_data)
-    return ok(data)
+    try:
+        data = search_jobs(serializer.validated_data)
+        return ok(data)
+    except Exception as exc:
+        return fail(
+            message="search service error",
+            code=5001,
+            data={"error": str(exc)},
+            status=500,
+        )
 
 
 @api_view(["GET"])
